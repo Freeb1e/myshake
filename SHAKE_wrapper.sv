@@ -21,20 +21,18 @@ module SHAKE_wrapper(
     logic wr_keccak;
     logic absorb_done;
     logic [31:0] din;
-    logic [6:0] addr_keccak;
+    logic [7:0] addr_keccak;
     logic [7:0] ABSORB_TOTAL_CNT;
     logic [5:0] ABSORB_ONCE_CNT;
     logic [2:0] last_state;
     assign ABSORB_TOTAL_CNT = absorb_num;
-    assign ABSORB_ONCE_CNT = (mode==1'b0)?6'd42:6'd34;
+    assign ABSORB_ONCE_CNT = (mode==1'b0)?6'd43:6'd34;
     // FSM ctrl
     parameter IDLE = 3'b000,
                INIT = 3'b001,
                ABSORB = 3'b010,
                SQUEEZING = 3'b011;
 
-    parameter SHAKE128_CNT=6'd42,
-               SHAKE256_CNT=6'd34;
 
     always_comb begin
         case(state)
@@ -48,6 +46,9 @@ module SHAKE_wrapper(
             ABSORB: begin
                 if(absorb_done) next_state = SQUEEZING;
                 else next_state = ABSORB;
+            end
+            SQUEEZING: begin
+                next_state = SQUEEZING;
             end
             default: next_state = IDLE;
         endcase
@@ -91,17 +92,21 @@ module SHAKE_wrapper(
                 else begin
                     cnt_absorb_once <= 6'd0;
                     init_keccak <= 1'b1;
-                    if(cnt_absorb_total < ABSORB_TOTAL_CNT )begin
+                    if(cnt_absorb_total < ABSORB_TOTAL_CNT)begin
                         cnt_absorb_total <= cnt_absorb_total + 8'd1;
                         if(cnt_absorb_total == absorb_num - 2) begin
                             PADDING_FLAG1 <= 1'b1;
                         end
+                        if(cnt_absorb_total == ABSORB_TOTAL_CNT -1) begin
+                            absorb_done <= 1'b1;
+                        end
                     end
                     else begin 
                         cnt_absorb_total <= cnt_absorb_total;
-                        absorb_done <= 1'b1;
                     end
                 end
+            end else if (!ready)begin
+                cnt_absorb_once <= 6'd0;
             end
         end
         end
@@ -110,18 +115,26 @@ module SHAKE_wrapper(
         if(!rst_n) begin
             addr_seed <= 32'd0;
             wr_keccak <= 1'b0;
-            addr_keccak <= 7'd0;
+            addr_keccak <= 8'd0;
         end
         else begin
             if(last_state!=ABSORB) begin
                 addr_seed <= 32'd0;
-                wr_keccak <= 1'b0;
-                addr_keccak <= 7'd0;
             end
             else begin
                 addr_seed <= addr_seed + 32'd4;
+            end
+            if(last_state!=ABSORB||!ready) begin
+                addr_keccak <= 8'd0;
+            end
+            else begin
+                addr_keccak <= addr_keccak + 8'd4;
+            end
+            if(state!=ABSORB) begin
+                wr_keccak <= 1'b0;
+            end
+            else begin
                 wr_keccak <= 1'b1;
-                addr_keccak <= addr_keccak + 7'd4;
             end
         end
     end
@@ -148,8 +161,8 @@ module SHAKE_wrapper(
                 end
                 else begin
                     if(PADDING_FLAG3)begin
-                        if(cnt_absorb_once == ABSORB_ONCE_CNT - 1)
-                        din<=32'h0000009F;
+                        if(cnt_absorb_once == ABSORB_ONCE_CNT - 2)
+                        din<=32'h80000000;
                         else
                         din<=32'h00000000;
                     end else din<=seed_buffer;
@@ -178,11 +191,13 @@ module SHAKE_wrapper(
 
 // interface with sha3
 logic init_keccak,next,init_keccak_trig;
+logic [6:0] comp_addr_keccak;
+assign comp_addr_keccak = {1'b0,addr_keccak[7:2]};
         sha3 u_sha3(
              .clk    	(clk     ),
              .nreset 	(nreset  ),
              .w      	(wr_keccak ),
-             .addr   	(addr_keccak    ),
+             .addr   	(comp_addr_keccak    ),
              .din    	(din     ),
              .dout   	(dout    ),
              .init   	(init_keccak    ),
