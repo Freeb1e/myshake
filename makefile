@@ -22,5 +22,7 @@ run: build
 
 RUN: run
 
+see: 
+	gtkwave waveform.vcd
 clean:
 	rm -rf obj_dir waveform.vcd
