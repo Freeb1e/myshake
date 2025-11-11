@@ -63,11 +63,12 @@ module sha3(    input wire          clk,
     */
 
    reg [31:0]                       dout_swap;
-   assign dout = {dout_swap[7:0], dout_swap[15:8], dout_swap[23:16], dout_swap[31:24]};
+   //assign dout = {dout_swap[7:0], dout_swap[15:8], dout_swap[23:16], dout_swap[31:24]};
+   assign dout = dout_swap;
 
    wire [31:0]                      din_swap;
-   assign din_swap = {din[7:0], din[15:8], din[23:16], din[31:24]};
-
+   //assign din_swap = {din[7:0], din[15:8], din[23:16], din[31:24]};
+    assign din_swap = din;
 
    integer                          i, j;
 

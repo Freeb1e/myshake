@@ -32,8 +32,8 @@ int main(int argc, char** argv, char** env) {
     dut->rst_n = 0;
     half_clock();
     dut->rst_n = 1;
-    dut->absorb_num=2;
-    dut->last_block_bytes=5;
+    dut->absorb_num=1;
+    dut->last_block_bytes=4;
     half_clock();
     dut->seed_buffer=seed_val;
     dut->init=1;
