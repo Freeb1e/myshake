@@ -2,6 +2,7 @@
 
 # 自动查找当前目录下所有的 .v 和 .sv 文件
 VERILOG_SOURCES := $(wildcard *.v *.sv)
+CSOURCES := $(wildcard *.cpp)
 
 build:
 	clear
@@ -14,7 +15,7 @@ build:
 	@echo "正在编译以下文件:"
 	@echo "$(VERILOG_SOURCES)"
 	# 运行 Verilator，传入所有找到的源文件
-	verilator --trace -cc $(VERILOG_SOURCES) --exe tb_shake.cpp --top-module SHAKE_wrapper -Mdir obj_dir
+	verilator --trace -cc $(VERILOG_SOURCES) --exe $(CSOURCES) --top-module SHAKE_wrapper -Mdir obj_dir
 	$(MAKE) -C obj_dir -f VSHAKE_wrapper.mk VSHAKE_wrapper
 
 run: build
