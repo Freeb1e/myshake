@@ -51,6 +51,7 @@ module sha3(    input wire          clk,
                 output wire [32-1:0] dout,
                 input wire 	     init,
                 input wire 	     next,
+                input wire 	     squeeze,
                 output wire 	     ready);
 
 
@@ -171,7 +172,7 @@ module sha3(    input wire          clk,
      //
      if (!nreset)       ready_reg <= 'b1;
      else begin
-        if (ready)      ready_reg <= !(init || next);
+        if (ready)      ready_reg <= !(init || next || squeeze);
         else            ready_reg <= !(round < roundlimit);
      end
 
@@ -196,10 +197,10 @@ module sha3(    input wire          clk,
 
            round <= round + 'd1;
 
-        end else if (init || next) begin
+        end else if (init || next || squeeze) begin
 
            for (i=0; i<25; i=i+1)
-             st[i] <= init ? blk[i] : st[i] ^ blk[i];   // init has priority over next
+             st[i] <= init ? blk[i] : (squeeze)? st[i] :(st[i] ^ blk[i]);   // init has priority over next
 
            round <= 'd0;
 

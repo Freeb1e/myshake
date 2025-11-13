@@ -11,13 +11,14 @@
 #include <iomanip>
 #include <cstdlib>
 
-#define MAX_SIM_TIME 500
+#define MAX_SIM_TIME 600
 vluint64_t sim_time = 0;
 void half_clock();
 void LENGTH_GET();
 VSHAKE_wrapper *dut = nullptr;
 VerilatedVcdC *m_trace = nullptr;
 uint32_t HASHRAM(uint32_t addr) ;
+int bytenum=168;
 int main(int argc, char** argv, char** env) {
     dut = new VSHAKE_wrapper;
 
@@ -31,14 +32,23 @@ int main(int argc, char** argv, char** env) {
     dut->rst_n = 0;
     half_clock();
     dut->rst_n = 1;
+    dut->mode = 0; // SHAKE256
+    dut->squeeze_num = 2; // 32 bytes output
+    if(dut->mode==0)
+        bytenum=168;
+    else
+        bytenum=136;
 
     LENGTH_GET();
 
     half_clock();
     dut->init=1;
+    half_clock();
+    half_clock();
+    dut->init=0;
     uint32_t addr=0;
     while (sim_time < MAX_SIM_TIME) {
-        addr = dut->addr_seed;
+        addr = dut->addr_perip;
         if(dut->clk==0)
             dut->seed_buffer = HASHRAM(addr);
         
@@ -86,10 +96,11 @@ void LENGTH_GET()
     ifstream fin("input_string.txt", ios::binary);
     fin.seekg(0, ios::end);
     int len = fin.tellg();
-    uint32_t a = len / 168+1;
-    uint32_t b = len % 168;
+    uint32_t a = len / bytenum;
+    uint32_t b = len % bytenum;
+    a += 1;
     dut->absorb_num=a & 0xFF;
     dut->last_block_bytes=b & 0xFF;
     cout << "文件长度: " << len << endl;
-    cout << "表示为: " << a << "*168 + " << b << endl;
+    cout << "表示为: " << a << "*"<<bytenum<< "+"  << b << endl;
 }
