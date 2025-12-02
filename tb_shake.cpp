@@ -15,6 +15,12 @@
 vluint64_t sim_time = 0;
 void half_clock();
 void LENGTH_GET();
+void bram_print(uint32_t *block);
+uint32_t bram_core(uint32_t addr, uint32_t din, bool we, bool clk,bool rst,uint32_t *block);
+
+uint32_t bram1[256*4]={0};
+
+
 VSHAKE_wrapper *dut = nullptr;
 VerilatedVcdC *m_trace = nullptr;
 uint32_t HASHRAM(uint32_t addr) ;
@@ -47,17 +53,18 @@ int main(int argc, char** argv, char** env) {
     half_clock();
     dut->init=0;
     uint32_t addr=0;
+    bram_print(bram1);
     while (sim_time < MAX_SIM_TIME) {
         addr = dut->addr_perip;
         if(dut->clk==0)
             dut->seed_buffer = HASHRAM(addr);
-        
+        bram_core(dut->addr_perip,dut->dout,dut->valid,dut->clk,dut->rst_n,bram1);
         dut->clk ^= 1;
         dut->eval();
         m_trace->dump(sim_time);
         sim_time++;
     }
-
+    bram_print(bram1);
     m_trace->close();
     delete dut;
     exit(EXIT_SUCCESS);
@@ -76,17 +83,14 @@ uint32_t HASHRAM(uint32_t addr)
 	std::ifstream fin("input_string.txt", ios::binary);
 	vector<unsigned char> buf((istreambuf_iterator<char>(fin)), istreambuf_iterator<char>());
 	if (addr < 0 || addr >= (int)buf.size()) {
-		//cout << "00000000" << endl;
 		return 0;
 	}
 	uint32_t data = 0;
-	// 假设小端序，越界补0
 	for (int i = 0; i < 4; ++i) {
 		if (addr + i < (int)buf.size()) {
 			data |= buf[addr + i] << (8 * i);
-		} // 超出部分自动补0
+		} 
 	}
-	//std::cout << std::hex << std::setfill('0') << std::setw(8) << data << std::endl;
 	return data;
 }
 
@@ -103,4 +107,27 @@ void LENGTH_GET()
     dut->last_block_bytes=b & 0xFF;
     cout << "文件长度: " << len << endl;
     cout << "表示为: " << a << "*"<<bytenum<< "+"  << b << endl;
+}
+
+uint32_t bram_core(uint32_t addr, uint32_t din, bool we, bool clk,bool rst,uint32_t *block) {
+    uint32_t word_index = addr/sizeof(uint32_t);
+    if(!rst){
+        memset(block,0,sizeof(uint32_t)*256);
+        return 0;
+    } else if(we && !clk) {
+        *(block+word_index) = din;
+        return 0;
+    } else {
+        return block[word_index];
+    }
+}
+
+void bram_print(uint32_t *block) {
+    using namespace std;
+    cout << "BRAM内容:" << endl;
+    for(int i=0;i<256;i++) {
+        cout << hex << setfill('0') << setw(8) << block[i] << " ";
+        if((i+1)%8==0)
+            cout << endl;
+    }
 }
