@@ -1,1 +1,3 @@
-基于SHA-3标准的可扩展输出函数，支持SHAKE128和SHAKE256算法
+6589acae 8c36943a 66b92cbc ab457b80 e321b7e8 1f2781b6 9950ac22 f2e6e10e 
+3b693b2a 7fb9defe eab089dc ed1ccd8d b7d8e22a 29b04bcf d1dad103 e5d99315 
+8cbc2495 ed6c5393 bf720738

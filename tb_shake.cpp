@@ -16,50 +16,54 @@ vluint64_t sim_time = 0;
 void half_clock();
 void LENGTH_GET();
 void bram_print(uint32_t *block);
-uint32_t bram_core(uint32_t addr, uint32_t din, bool we, bool clk,bool rst,uint32_t *block);
-
-uint32_t bram1[256*4]={0};
-
+uint32_t bram_core(uint32_t addr, uint32_t din, bool we, bool clk, bool rst, uint32_t *block);
+bool last_clk = 0;
+uint32_t rdata = 0,buffer32=0;
+uint32_t bram1[256 * 4] = {0};
 
 VSHAKE_wrapper *dut = nullptr;
 VerilatedVcdC *m_trace = nullptr;
-uint32_t HASHRAM(uint32_t addr) ;
-int bytenum=168;
-int main(int argc, char** argv, char** env) {
+uint32_t HASHRAM(uint32_t addr, bool clk);
+int bytenum = 168;
+int main(int argc, char **argv, char **env)
+{
     dut = new VSHAKE_wrapper;
 
     Verilated::traceEverOn(true);
     m_trace = new VerilatedVcdC;
     dut->trace(m_trace, 5);
     m_trace->open("waveform.vcd");
-   
+
     dut->rst_n = 1;
     half_clock();
     dut->rst_n = 0;
     half_clock();
     dut->rst_n = 1;
-    dut->mode = 0; // SHAKE256
+    dut->mode = 1;        // SHAKE256
     dut->squeeze_num = 2; // 32 bytes output
-    if(dut->mode==0)
-        bytenum=168;
+    if (dut->mode == 0)
+        bytenum = 168;
     else
-        bytenum=136;
+        bytenum = 136;
 
     LENGTH_GET();
 
     half_clock();
-    dut->init=1;
+    dut->init = 1;
     half_clock();
     half_clock();
-    dut->init=0;
-    uint32_t addr=0;
-    bram_print(bram1);
-    while (sim_time < MAX_SIM_TIME) {
-        addr = dut->addr_perip;
-        if(dut->clk==0)
-            dut->seed_buffer = HASHRAM(addr);
-        bram_core(dut->addr_perip,dut->dout,dut->valid,dut->clk,dut->rst_n,bram1);
+    dut->init = 0;
+    uint32_t addr = 0;
+    //bram_print(bram1);
+    while (sim_time < MAX_SIM_TIME)
+    {
         dut->clk ^= 1;
+        addr = dut->addr_perip;
+        buffer32 = HASHRAM(addr,dut->clk);
+        if (dut->clk == 0)
+            dut->seed_buffer = buffer32;
+        bram_core(dut->addr_perip, dut->dout, dut->valid, dut->clk, dut->rst_n, bram1);
+        
         dut->eval();
         m_trace->dump(sim_time);
         sim_time++;
@@ -68,33 +72,47 @@ int main(int argc, char** argv, char** env) {
     m_trace->close();
     delete dut;
     exit(EXIT_SUCCESS);
-} 
+}
 
-void half_clock() {
+void half_clock()
+{
     dut->clk ^= 1;
     dut->eval();
     m_trace->dump(sim_time);
     sim_time++;
 }
 
-uint32_t HASHRAM(uint32_t addr) 
+uint32_t HASHRAM(uint32_t addr, bool clk)
 {
     using namespace std;
-	std::ifstream fin("input_string.txt", ios::binary);
-	vector<unsigned char> buf((istreambuf_iterator<char>(fin)), istreambuf_iterator<char>());
-	if (addr < 0 || addr >= (int)buf.size()) {
-		return 0;
-	}
-	uint32_t data = 0;
-	for (int i = 0; i < 4; ++i) {
-		if (addr + i < (int)buf.size()) {
-			data |= buf[addr + i] << (8 * i);
-		} 
-	}
-	return data;
+    std::ifstream fin("input_string.txt", ios::binary);
+    bool ispos = clk && (!last_clk); 
+    //cout<<"time="<<sim_time<<"clk="<<clk<<"last_clk="<<last_clk<<" ispos="<<ispos<<" addr="<<addr<<endl;
+    if (ispos)
+    {
+       
+        vector<unsigned char> buf((istreambuf_iterator<char>(fin)), istreambuf_iterator<char>());
+        if (addr < 0 || addr >= (int)buf.size())
+        {
+            rdata = 0;
+        }
+        else
+        {
+            rdata = 0;
+            for (int i = 0; i < 4; ++i)
+            {
+                if (addr + i < (int)buf.size())
+                {
+                    rdata |= buf[addr + i] << (8 * i);
+                }
+            }
+        }
+    }
+    last_clk = clk;
+    return rdata;
 }
 
-void LENGTH_GET() 
+void LENGTH_GET()
 {
     using namespace std;
     ifstream fin("input_string.txt", ios::binary);
@@ -103,31 +121,39 @@ void LENGTH_GET()
     uint32_t a = len / bytenum;
     uint32_t b = len % bytenum;
     a += 1;
-    dut->absorb_num=a & 0xFF;
-    dut->last_block_bytes=b & 0xFF;
+    dut->absorb_num = a & 0xFF;
+    dut->last_block_bytes = b & 0xFF;
     cout << "文件长度: " << len << endl;
-    cout << "表示为: " << a << "*"<<bytenum<< "+"  << b << endl;
+    cout << "表示为: " << a << "*" << bytenum << "+" << b << endl;
 }
 
-uint32_t bram_core(uint32_t addr, uint32_t din, bool we, bool clk,bool rst,uint32_t *block) {
-    uint32_t word_index = addr/sizeof(uint32_t);
-    if(!rst){
-        memset(block,0,sizeof(uint32_t)*256);
+uint32_t bram_core(uint32_t addr, uint32_t din, bool we, bool clk, bool rst, uint32_t *block)
+{
+    uint32_t word_index = addr / sizeof(uint32_t);
+    if (!rst)
+    {
+        memset(block, 0, sizeof(uint32_t) * 256);
         return 0;
-    } else if(we && !clk) {
-        *(block+word_index) = din;
+    }
+    else if (we && !clk)
+    {
+        *(block + word_index) = din;
         return 0;
-    } else {
+    }
+    else
+    {
         return block[word_index];
     }
 }
 
-void bram_print(uint32_t *block) {
+void bram_print(uint32_t *block)
+{
     using namespace std;
     cout << "BRAM内容:" << endl;
-    for(int i=0;i<256;i++) {
+    for (int i = 0; i < 256; i++)
+    {
         cout << hex << setfill('0') << setw(8) << block[i] << " ";
-        if((i+1)%8==0)
+        if ((i + 1) % 8 == 0)
             cout << endl;
     }
 }
